@@ -5,42 +5,59 @@ import java.io.*;
 
 public class MLP{
 
+	private static int[] transferFunctions;
+	private static double[] rates;
+	private static double[] momentum;
+	
 	private int numberOfLayers;
-	private double[][][] weights;
-	private int[] transferFunctions;
-	private List<Double> errorCurvePoints;
+	private int numberOfInputs;
+	private int numberOfOutputs;
 	private double[][] inputDataEpoch;
-	private double[][] teacher;
+	private double[][][] weights;
 	private double[][][] deltas;
 	private double[][][] weightChanges;
 	private double[][][] cumulativeWeightChanges;
+	private List<Double> errorCurvePoints;
+	private double[][] teacher;
 	private double[][] outputs;
-	private static double[] rates;
-	private static double[] momentum;
-
-	public MLP(int[] numberOfNeurons, int seed, int[] transferFunctions){
-		this.numberOfLayers = numberOfNeurons.length;
-		this.transferFunctions = transferFunctions;
-
+	
+	private void setInitialWeights(int[] numberOfNeurons) {
+//		- 1 because we do not have weights for input layer
 		weights = new double[numberOfLayers-1][][];
 		for(int i=0; i<numberOfLayers-1; i++){
+//			for each layer we get particular number of neurons with number of inputs + BIAS
 			weights[i] = new double[numberOfNeurons[i+1]][numberOfNeurons[i]+1];
 		}
+//		initialize weight changes with zeroes - so momentum and cumulated weights change for the first step is 0
+		weightChanges = new double[numberOfLayers-1][][];
+		for(int i=0; i<numberOfLayers-1; i++){
+			weightChanges[i] = new double[numberOfNeurons[i+1]][numberOfNeurons[i]+1];
+			for(double[] neuronWeights : weightChanges[i])
+				Arrays.fill(neuronWeights, 0.0);
+		}
+		cumulativeWeightChanges = new double[numberOfLayers-1][][];
+		for(int i=0; i<numberOfLayers-1; i++){
+			cumulativeWeightChanges[i] = new double[numberOfNeurons[i+1]][numberOfNeurons[i]+1];
+			for(double[] neuronWeights : cumulativeWeightChanges[i])
+				Arrays.fill(neuronWeights, 0.0);
+		}
+	}
+
+	public MLP(int[] numberOfNeurons, int seed){
+		this.numberOfLayers = numberOfNeurons.length;
+		this.numberOfInputs = numberOfNeurons[0];
+		this.numberOfInputs = numberOfNeurons[numberOfNeurons.length - 1];
+		setInitialWeights(numberOfNeurons);
 		initializeRandomWeights(seed);
 	}
 
-
 	//The second constructor which initializes weights from file
-	public MLP(int[] numberOfNeurons, String fileWithWeights, int[] transferFunctions){
+	public MLP(int[] numberOfNeurons, String fileWithWeights){
 		this.numberOfLayers = numberOfNeurons.length;
-		this.transferFunctions = transferFunctions;
-
-		weights = new double[numberOfLayers-1][][];
-		for(int i=0; i<numberOfLayers-1; i++){
-			weights[i] = new double[numberOfNeurons[i+1]][numberOfNeurons[i]+1];
-		}
+		this.numberOfInputs = numberOfNeurons[0];
+		this.numberOfInputs = numberOfNeurons[numberOfNeurons.length - 1];
+		setInitialWeights(numberOfNeurons);
 		initializeWeightsFromFile(fileWithWeights);
-
 	}
 
 	private void initializeWeightsFromFile(String filename){
@@ -59,6 +76,9 @@ public class MLP{
 		}
 		catch (FileNotFoundException e) {
 			System.out.println("File with weights not found!");
+		}
+		catch (Exception e) {
+			System.out.println("Wrong dimensions in file!");
 		}
 	}
 
@@ -126,9 +146,8 @@ public class MLP{
 		
 	}
 
-	//Reads file and returns an array of input values for the MLP
+	//Reads file and sets an array of input values for the MLP
 	private void getInputsFromFile(String inputFilename){
-		int numberOfInputs = weights[0][1].length - 1;
 		try{
 			BufferedReader br = new BufferedReader(new FileReader(inputFilename));
 			String line;
@@ -191,13 +210,41 @@ public class MLP{
 		writeToFile(netOutputs, outputFilename);
 	}
 	
-	private void readTeacherOutput(String filename) {
-//		read teacher output to teacher array
+//	for getting teacher values from file
+	private void readTeacherOutput(String inputFilename) {
+		try{
+			BufferedReader br = new BufferedReader(new FileReader(inputFilename));
+			String line;
+			line = br.readLine();
+			line = br.readLine();
+			String stringWithNumberOfPatterns = line.split(" ")[1];
+			int numberOfPatterns = Integer.parseInt(stringWithNumberOfPatterns.substring(2));
+			teacher = new double[numberOfPatterns][numberOfOutputs];
+			int j=0;
+			while ((line = br.readLine()) != null) {
+   				if (line.startsWith("#")){
+   					continue;
+   				} else {
+   					String[] allValues = line.split(" ");
+   					double[] row = new double[numberOfOutputs];
+   					for(int i=numberOfInputs; i<numberOfInputs + numberOfOutputs; i++){
+   						row[i - numberOfInputs] = Double.parseDouble(allValues[i]);
+   					}
+   					teacher[j] = row;
+   					j++;
+   				}
+   				
+			}
+			br.close();
+		}
+		catch(IOException e){
+			System.out.println( e.getMessage() );
+		}
 	}
 	
 //	shuffle input arrays
 	private static void shuffleInputData() {
-//		use inputDataEpoch
+//		TODO implement! use inputDataEpoch
 	}
 	
 //	count error
@@ -212,6 +259,7 @@ public class MLP{
 	private double[] singleInputRun(double[] input) {
 //		go by layers and apply transferfunctions to get output
 //		save outputs for each neuron
+		return input;
 	}
 	
 	private List<Double> batchLearning() {
@@ -262,17 +310,38 @@ public class MLP{
 	}
 	
 	private void applyWeightChanges() {
-//		just sum up changes with weights
+		int layerIndex = 0, neuronIndex = 0, weightIndex = 0;
+		for(double[][] layer : weights) {
+			for(double[] neuron : layer) {
+				for(double weight : neuron) {
+					weights[layerIndex][neuronIndex][weightIndex] += weightChanges[layerIndex][neuronIndex][weightIndex];
+					weightIndex ++;
+				}
+				neuronIndex ++;
+			}
+			layerIndex ++;
+		}
 	}
 	
 	private void applyCumulativeWeightChanges() {
-//		just sum up cumulated changes with weights
+		int layerIndex = 0, neuronIndex = 0, weightIndex = 0;
+		for(double[][] layer : weights) {
+			for(double[] neuron : layer) {
+				for(double weight : neuron) {
+					weights[layerIndex][neuronIndex][weightIndex] += cumulativeWeightChanges[layerIndex][neuronIndex][weightIndex];
+					weightIndex ++;
+				}
+				neuronIndex ++;
+			}
+			layerIndex ++;
+		}
 	}
 	
 	private double weightChange(int layer, int neuron, int weight) {
 //		count delta - by the corresponding rule if the layer is output or hidden
 //		put delta into deltas for further use
 //		count weight change
+		return 0.0;
 	}
 	
 	public static void main(String[] args){
@@ -283,16 +352,24 @@ public class MLP{
 		//Number of neurons in each layer
 		int[] configuration = {4, 2, 2};
 		
-		rates = {0.1, 0.1, 0.1};
+		//rates of learning for every hidden performing calculations layer
+		double[] userRates = {0.1, 0.1};
+		rates = userRates;
+
+		//momentum for every hidden performing calculations layer
+		double[] userMomentum = {0.2, 0.2};
+		momentum = userMomentum;
 		
-		momentum = {0.2, 0.2, 0.2};
 		//Seed for random generator
 		int seed = 42;
+		
 		// Trnsfer functions for each layer:
 		//0 - identity, 1 - tahn, 2 - logistic
-		int[] transferFunctions = {1,2,2};
+		int[] userTransferFunctions = {1, 2};
+		transferFunctions = userTransferFunctions;
+		
 		//Should always be true:
-		//configuration.length == transferFunctions.length - 1
+		//configuration.length == transferFunctions.length + 1
 		String inputFilename = "training.dat";
 		String outputFilename = "output.dat";
 
@@ -300,17 +377,25 @@ public class MLP{
 		Set parameters here
 		******************************/
 
-//		TODO check if the arrays length are the same
-//		TODO check if weights data has the same dimensions
+//		check if the arrays length are correct
+		if(configuration.length != rates.length + 1 || 
+				configuration.length != momentum.length + 1 ||
+				configuration.length != transferFunctions.length + 1) {
+			System.out.println("Wrong parameters for setting MLP, check up the sizes of initialization data!");
+			return;
+		}
 
+		//uncomment to get random MLP
 		//MLP mlp = new MLP(configuration, seed, transferFunctions);
-		MLP mlp = new MLP(configuration, "weights.dat", transferFunctions);
-		mlp.printWeights();
-		mlp.run(inputFilename, outputFilename);
 		
+		//uncomment to get MLP from the weights.dat
+		MLP mlp = new MLP(configuration, "weights.dat");
+		
+		mlp.printWeights();
+		mlp.getInputsFromFile(inputFilename);
 		mlp.readTeacherOutput(inputFilename);
 		
-//		TODO initialize weight changes with zeroes - so momentum for the first step is 0
+		mlp.run(inputFilename, outputFilename);
 		
 		Scanner in = new Scanner(System.in);
 		System.out.println("Enter type of learning (batch or single)");
