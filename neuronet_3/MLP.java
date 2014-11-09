@@ -280,11 +280,8 @@ public class MLP{
 		String filename = "learning.curve";
 		try{
 			fout = new PrintWriter(filename);
-
-			for(int i=0; i<errorCurvePoints.size(); i++){
-				fout.printf("%d ", i);
-				fout.printf("%f", errorCurvePoints.get(i));
-				}
+			for(int i=0; i<errorCurvePoints.size(); i++)
+				fout.printf("%d %f ", i, errorCurvePoints.get(i));
 			fout.close();
 		}
 		catch (FileNotFoundException e){
