@@ -115,7 +115,7 @@ public class MLP{
 		for(int neuronIndex=0; neuronIndex < outputs.length; neuronIndex++){
 			double net = 1*weights[layerNumber][neuronIndex][0]; //BIAS
 			for (int j = 1; j < weights[layerNumber][neuronIndex].length; j++){
-				net += inputs[j-1] * weights[layerNumber][neuronIndex][j+1];
+				net += inputs[j-1] * weights[layerNumber][neuronIndex][j];
 			}
 			outputs[neuronIndex] = transfer(net, layerNumber);
 		}
