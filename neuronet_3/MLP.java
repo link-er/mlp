@@ -191,18 +191,14 @@ public class MLP{
 
 	//Read input from inputFilename and 
 	//saves the output of the MLP to the outputFilename
-	public void run(String inputFilename, String outputFilename){
-		//Read file line by line, parse, get inputs
+	public void runWithOutput(String outputFilename){
 		double[][] netOutputs = new double[inputDataEpoch.length][numberOfOutputs];
 		//Run for all layers for every output
 		double[] previousOutput;
-		for(int i=0; i<inputDataEpoch.length; i++){
-			previousOutput = inputDataEpoch[i];
-//			start from the first hidden layer
-			for(int j=0; j<numberOfLayers-1; j++){
-				previousOutput = getLayerOutput(previousOutput, j);
-			}
-			netOutputs[i] = previousOutput;
+		int outputIndex = 0;
+		for(double[] input : inputDataEpoch){
+			netOutputs[outputIndex] = run(input);
+			outputIndex++;
 		}
 		// Write the whole output to the file
 		writeToFile(netOutputs, outputFilename);
@@ -254,10 +250,15 @@ public class MLP{
 //		write down error point to file for passing to gnuplot
 	}
 	
-	private double[] singleInputRun(double[] input) {
+	private double[] run(double[] input) {
 //		go by layers and apply transferfunctions to get output
 //		save outputs for each neuron
-		return input;
+		double[] previousOutput = input;
+//		start from the first hidden layer
+		for(int j=0; j<numberOfLayers-1; j++){
+			previousOutput = getLayerOutput(previousOutput, j);
+		}
+		return previousOutput;
 	}
 	
 	private List<Double> batchLearning() {
@@ -265,7 +266,7 @@ public class MLP{
 		
 		int patternNumber = 0;
 		for(double[] input : inputDataEpoch) {
-			double[] result = singleInputRun(input);
+			double[] result = run(input);
 			
 			int layerIndex = 0, neuronIndex = 0, weightIndex = 0;
 			for(double[][] layer : weights) {
@@ -289,7 +290,7 @@ public class MLP{
 	}
 
 	private double singleStepLearning(double[] input, int patternNumber) {
-		double[] result = singleInputRun(input);
+		double[] result = run(input);
 		
 		int layerIndex = 0, neuronIndex = 0, weightIndex = 0;
 		for(double[][] layer : weights) {
@@ -394,7 +395,7 @@ public class MLP{
 		mlp.readTeacherOutput(inputFilename);
 		
 		
-		mlp.run(inputFilename, outputFilename);
+		mlp.runWithOutput(outputFilename);
 		
 		Scanner in = new Scanner(System.in);
 		System.out.println("Enter type of learning (batch or single)");
