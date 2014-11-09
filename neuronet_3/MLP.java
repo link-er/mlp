@@ -14,12 +14,12 @@ public class MLP{
 	private int numberOfOutputs;
 	private double[][] inputDataEpoch;
 	private double[][][] weights;
-	private double[][][] deltas;
+	private double[][] deltas;
 	private double[][][] weightChanges;
 	private double[][][] cumulativeWeightChanges;
 	private List<Double> errorCurvePoints;
 	private double[][] teacher;
-	private double[][] outputs;
+	private double[][] outputsByNeurons;
 	
 	private void setInitialWeights(int[] numberOfNeurons) {
 //		- 1 because we do not have weights for input layer
@@ -106,6 +106,15 @@ public class MLP{
 			default: return -42;
 		}
 	}
+	
+	private double deriviative(int layerNumber, int neuronNumber) {
+		switch (transferFunctions[layerNumber]){
+			case 0: return 1;
+			case 1: return outputsByNeurons[layerNumber][neuronNumber]*(1 - outputsByNeurons[layerNumber][neuronNumber]);
+			case 2: return 1 - Math.pow(outputsByNeurons[layerNumber][neuronNumber], 2);
+			default: return -42;
+		}
+	}
 
 	//Given the input for the layer and the number of layer
 	//returns the output of layer
@@ -118,6 +127,7 @@ public class MLP{
 				net += inputs[j-1] * weights[layerNumber][neuronIndex][j];
 			}
 			outputs[neuronIndex] = transfer(net, layerNumber);
+			outputsByNeurons[layerNumber][neuronIndex] = outputs[neuronIndex];
 		}
 		return outputs;
 	}
@@ -138,9 +148,7 @@ public class MLP{
 		}
 		catch (FileNotFoundException e){
 			System.out.println( e.getMessage() );
-
 		} 
-		
 	}
 
 	//Reads file and sets an array of input values for the MLP
@@ -241,13 +249,16 @@ public class MLP{
 //		TODO implement! use inputDataEpoch
 	}
 	
-//	count error
-	private static double error(double[] output, double[] teacher) {
-		return 0.0;
+//	count error by standard formula
+	private double error(double[] output, double[] teacher) {
+		double sum = 0.0;
+		for(int i=0; i<numberOfOutputs; i++)
+			sum += Math.pow(output[i] - teacher[i], 2);
+		return 0.5*sum;
 	}
 
 	private void printOutErrorCurve(){
-//		write down error point to file for passing to gnuplot
+//		TODO write down error point to file for passing to gnuplot
 	}
 	
 	private double[] run(double[] input) {
@@ -336,8 +347,27 @@ public class MLP{
 		}
 	}
 	
+	private double delta(int patternNumber, int layer, int neuron) {
+		double delta = 0;
+		if(layer == numberOfLayers - 1) {
+			delta = (teacher[patternNumber][neuron] - outputsByNeurons[layer][neuron])*deriviative(layer, neuron);
+			deltas[layer][neuron] = delta;
+		}
+		else {
+			double sumDeltas = 0.0;
+			double[] prevLayerDeltas = deltas[layer - 1];
+			int prevLayerNeuron = 0;
+			for(double prevDelta : prevLayerDeltas) {
+				sumDeltas += prevDelta * weights[layer-1][prevLayerNeuron][neuron];
+				prevLayerNeuron++;
+			}
+			
+		}
+	}
+	
 	private double weightChange(int layer, int neuron, int weight) {
 //		count delta - by the corresponding rule if the layer is output or hidden
+		if 
 //		put delta into deltas for further use
 //		count weight change
 		return 0.0;
