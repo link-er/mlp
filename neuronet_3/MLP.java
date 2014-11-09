@@ -17,7 +17,7 @@ public class MLP{
 	private double[][] deltas;
 	private double[][][] weightChanges;
 	private double[][][] cumulativeWeightChanges;
-	private List<Double> errorCurvePoints;
+	private List<Double> errorCurvePoints = new ArrayList<>();
 	private double[][] teacher;
 	private double[][] outputsByNeurons;
 	
@@ -27,6 +27,16 @@ public class MLP{
 		for(int i=0; i<numberOfLayers-1; i++){
 //			for each layer we get particular number of neurons with number of inputs + BIAS
 			weights[i] = new double[numberOfNeurons[i+1]][numberOfNeurons[i]+1];
+		}
+		outputsByNeurons = new double[numberOfLayers-1][];
+		for(int i=0; i<numberOfLayers-1; i++){
+//			for each layer we get particular number of neurons with number of inputs + BIAS
+			outputsByNeurons[i] = new double[numberOfNeurons[i+1]];
+		}
+		deltas = new double[numberOfLayers-1][];
+		for(int i=0; i<numberOfLayers-1; i++){
+//			for each layer we get particular number of neurons with number of inputs + BIAS
+			deltas[i] = new double[numberOfNeurons[i+1]];
 		}
 //		initialize weight changes with zeroes - so momentum and cumulated weights change for the first step is 0
 		weightChanges = new double[numberOfLayers-1][][];
@@ -245,8 +255,15 @@ public class MLP{
 	}
 	
 //	shuffle input arrays
-	private static void shuffleInputData() {
-//		TODO implement! use inputDataEpoch
+	private void shuffleInputData() {
+		Random rand = new Random();
+		double[] temp = new double[inputDataEpoch[0].length];
+		for(int i=0; i<inputDataEpoch.length; i++){
+			int randIndex = rand.nextInt(inputDataEpoch.length);
+			temp = inputDataEpoch[i];
+			inputDataEpoch[i] = inputDataEpoch[randIndex];
+			inputDataEpoch[randIndex] = temp;
+		}
 	}
 	
 //	count error by standard formula
@@ -258,7 +275,21 @@ public class MLP{
 	}
 
 	private void printOutErrorCurve(){
-//		TODO write down error point to file for passing to gnuplot
+//		write down error point to file for passing to gnuplot
+		PrintWriter fout;
+		String filename = "learning.curve";
+		try{
+			fout = new PrintWriter(filename);
+
+			for(int i=0; i<errorCurvePoints.size(); i++){
+				fout.printf("%d ", i);
+				fout.printf("%f", errorCurvePoints.get(i));
+				}
+			fout.close();
+		}
+		catch (FileNotFoundException e){
+			System.out.println( e.getMessage() );
+		} 
 	}
 	
 	private double[] run(double[] input) {
@@ -279,18 +310,22 @@ public class MLP{
 		for(double[] input : inputDataEpoch) {
 			double[] result = run(input);
 			
-			int layerIndex = 0, neuronIndex = 0, weightIndex = 0;
-			for(double[][] layer : weights) {
-				for(double[] neuron : layer) {
+			int neuronIndex = 0, weightIndex = 0;
+			for(int layerIndex = numberOfLayers-2; layerIndex>=0; layerIndex-- ) {
+				for(double[] neuron : weights[layerIndex]) {
+					double delta = delta(patternNumber, layerIndex, neuronIndex);
 					for(double weight : neuron) {
-						weightChanges[layerIndex][neuronIndex][weightIndex] = weightChange(layerIndex, neuronIndex, weightIndex);
+						weightChanges[layerIndex][neuronIndex][weightIndex] = 
+								weightChange(layerIndex, neuronIndex, weightIndex, delta);
 						cumulativeWeightChanges[layerIndex][neuronIndex][weightIndex] += 
 								weightChanges[layerIndex][neuronIndex][weightIndex];
 						weightIndex ++;
 					}
 					neuronIndex ++;
+					weightIndex = 0;
 				}
 				layerIndex ++;
+				neuronIndex = 0;
 			}
 			errors.add(error(result, teacher[patternNumber]));
 			patternNumber ++;
@@ -303,16 +338,19 @@ public class MLP{
 	private double singleStepLearning(double[] input, int patternNumber) {
 		double[] result = run(input);
 		
-		int layerIndex = 0, neuronIndex = 0, weightIndex = 0;
-		for(double[][] layer : weights) {
-			for(double[] neuron : layer) {
+		int neuronIndex = 0, weightIndex = 0;
+		for(int layerIndex = numberOfLayers-2; layerIndex>=0; layerIndex-- ) {
+			for(double[] neuron : weights[layerIndex]) {
+				double delta = delta(patternNumber, layerIndex, neuronIndex);
 				for(double weight : neuron) {
-					weightChanges[layerIndex][neuronIndex][weightIndex] = weightChange(layerIndex, neuronIndex, weightIndex);
+					weightChanges[layerIndex][neuronIndex][weightIndex] = 
+							weightChange(layerIndex, neuronIndex, weightIndex, delta);
 					weightIndex ++;
 				}
 				neuronIndex ++;
+				weightIndex = 0;
 			}
-			layerIndex ++;
+			neuronIndex = 0;
 		}
 		applyWeightChanges();
 		
@@ -328,8 +366,10 @@ public class MLP{
 					weightIndex ++;
 				}
 				neuronIndex ++;
+				weightIndex = 0;
 			}
 			layerIndex ++;
+			neuronIndex = 0;
 		}
 	}
 	
@@ -342,23 +382,26 @@ public class MLP{
 					weightIndex ++;
 				}
 				neuronIndex ++;
+				weightIndex = 0;
 			}
 			layerIndex ++;
+			neuronIndex = 0;
 		}
 	}
 	
 	private double delta(int patternNumber, int layer, int neuron) {
 		double delta = 0;
-		if(layer == numberOfLayers - 1) {
+//		last layer, because we save deltas only for "computative" layers
+		if(layer == numberOfLayers - 2) {
 			delta = (teacher[patternNumber][neuron] - outputsByNeurons[layer][neuron])*deriviative(layer, neuron);
 		}
 		else {
 			double sumDeltas = 0.0;
-			double[] prevLayerDeltas = deltas[layer - 1];
-			int prevLayerNeuron = 0;
-			for(double prevDelta : prevLayerDeltas) {
-				sumDeltas += prevDelta * weights[layer-1][prevLayerNeuron][neuron];
-				prevLayerNeuron++;
+			double[] belowLayerDeltas = deltas[layer + 1];
+			int belowLayerNeuron = 0;
+			for(double belowDelta : belowLayerDeltas) {
+				sumDeltas += belowDelta * weights[layer+1][belowLayerNeuron][neuron];
+				belowLayerNeuron++;
 			}
 			delta = sumDeltas * deriviative(layer, neuron);
 		}
@@ -366,12 +409,9 @@ public class MLP{
 		return delta;
 	}
 	
-	private double weightChange(int layer, int neuron, int weight) {
-//		count delta - by the corresponding rule if the layer is output or hidden
-		if 
-//		put delta into deltas for further use
-//		count weight change
-		return 0.0;
+	private double weightChange(int layer, int neuron, int weight, double delta) {
+		return rates[layer]*delta*outputsByNeurons[layer][neuron] + 
+			momentum[layer]*weightChanges[layer][neuron][weight];
 	}
 	
 	public static void main(String[] args){
@@ -440,7 +480,7 @@ public class MLP{
 				}
 			}
 			for(int i=0; i<epochsCount; i++){
-				shuffleInputData();
+				mlp.shuffleInputData();
 				for(double error : mlp.batchLearning()) {
 					mlp.errorCurvePoints.add(error);
 				}
