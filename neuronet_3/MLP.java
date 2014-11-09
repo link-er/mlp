@@ -351,7 +351,6 @@ public class MLP{
 		double delta = 0;
 		if(layer == numberOfLayers - 1) {
 			delta = (teacher[patternNumber][neuron] - outputsByNeurons[layer][neuron])*deriviative(layer, neuron);
-			deltas[layer][neuron] = delta;
 		}
 		else {
 			double sumDeltas = 0.0;
@@ -361,8 +360,10 @@ public class MLP{
 				sumDeltas += prevDelta * weights[layer-1][prevLayerNeuron][neuron];
 				prevLayerNeuron++;
 			}
-			
+			delta = sumDeltas * deriviative(layer, neuron);
 		}
+		deltas[layer][neuron] = delta;
+		return delta;
 	}
 	
 	private double weightChange(int layer, int neuron, int weight) {
