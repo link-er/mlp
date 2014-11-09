@@ -46,7 +46,7 @@ public class MLP{
 	public MLP(int[] numberOfNeurons, int seed){
 		this.numberOfLayers = numberOfNeurons.length;
 		this.numberOfInputs = numberOfNeurons[0];
-		this.numberOfInputs = numberOfNeurons[numberOfNeurons.length - 1];
+		this.numberOfOutputs = numberOfNeurons[numberOfNeurons.length - 1];
 		setInitialWeights(numberOfNeurons);
 		initializeRandomWeights(seed);
 	}
@@ -55,7 +55,7 @@ public class MLP{
 	public MLP(int[] numberOfNeurons, String fileWithWeights){
 		this.numberOfLayers = numberOfNeurons.length;
 		this.numberOfInputs = numberOfNeurons[0];
-		this.numberOfInputs = numberOfNeurons[numberOfNeurons.length - 1];
+		this.numberOfOutputs = numberOfNeurons[numberOfNeurons.length - 1];
 		setInitialWeights(numberOfNeurons);
 		initializeWeightsFromFile(fileWithWeights);
 	}
@@ -110,17 +110,14 @@ public class MLP{
 	//Given the input for the layer and the number of layer
 	//returns the output of layer
 	private double[] getLayerOutput(double[] inputs, int layerNumber){
+//		layerNumber is always smaller than real layer index, as we count only calculative layers
 		double[] outputs = new double[weights[layerNumber].length];
-		//System.out.println(weights[layerNumber].length);
-		//System.out.println(inputs.length);
-		for(int i=0; i < outputs.length; i++){
-			double net = 1*weights[layerNumber][i][0];
-			//System.out.println(weights[layerNumber][i].length);
-			for (int j = 0; j < weights[layerNumber][i].length-1; j++){
-				//System.out.println(j);
-				net += inputs[j] * weights[layerNumber][i][j+1];
+		for(int neuronIndex=0; neuronIndex < outputs.length; neuronIndex++){
+			double net = 1*weights[layerNumber][neuronIndex][0]; //BIAS
+			for (int j = 1; j < weights[layerNumber][neuronIndex].length; j++){
+				net += inputs[j-1] * weights[layerNumber][neuronIndex][j+1];
 			}
-			outputs[i] = transfer(net, layerNumber);
+			outputs[neuronIndex] = transfer(net, layerNumber);
 		}
 		return outputs;
 	}
@@ -153,7 +150,7 @@ public class MLP{
 			String line;
 			line = br.readLine();
 			line = br.readLine();
-			String stringWithNumberOfPatterns = line.split(" ")[1];
+			String stringWithNumberOfPatterns = line.replaceAll("\\s+", " ").split(" ")[1];
 			int numberOfPatterns = Integer.parseInt(stringWithNumberOfPatterns.substring(2));
 			inputDataEpoch = new double[numberOfPatterns][numberOfInputs];
 			int j=0;
@@ -196,11 +193,12 @@ public class MLP{
 	//saves the output of the MLP to the outputFilename
 	public void run(String inputFilename, String outputFilename){
 		//Read file line by line, parse, get inputs
-		double[][] netOutputs = new double[inputDataEpoch.length][weights[numberOfLayers-2].length];
+		double[][] netOutputs = new double[inputDataEpoch.length][numberOfOutputs];
 		//Run for all layers for every output
 		double[] previousOutput;
 		for(int i=0; i<inputDataEpoch.length; i++){
 			previousOutput = inputDataEpoch[i];
+//			start from the first hidden layer
 			for(int j=0; j<numberOfLayers-1; j++){
 				previousOutput = getLayerOutput(previousOutput, j);
 			}
@@ -225,7 +223,7 @@ public class MLP{
    				if (line.startsWith("#")){
    					continue;
    				} else {
-   					String[] allValues = line.split(" ");
+   					String[] allValues = line.replaceAll("\\s+", " ").split(" ");
    					double[] row = new double[numberOfOutputs];
    					for(int i=numberOfInputs; i<numberOfInputs + numberOfOutputs; i++){
    						row[i - numberOfInputs] = Double.parseDouble(allValues[i]);
@@ -386,14 +384,15 @@ public class MLP{
 		}
 
 		//uncomment to get random MLP
-		//MLP mlp = new MLP(configuration, seed, transferFunctions);
+		MLP mlp = new MLP(configuration, seed);
 		
 		//uncomment to get MLP from the weights.dat
-		MLP mlp = new MLP(configuration, "weights.dat");
+		//MLP mlp = new MLP(configuration, "weights.dat");
 		
 		mlp.printWeights();
 		mlp.getInputsFromFile(inputFilename);
 		mlp.readTeacherOutput(inputFilename);
+		
 		
 		mlp.run(inputFilename, outputFilename);
 		
