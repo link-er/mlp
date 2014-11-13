@@ -1,4 +1,4 @@
-package neuronet_3;
+package neuronet_3; //Should not be there
 
 import java.util.*;
 import java.io.*;
