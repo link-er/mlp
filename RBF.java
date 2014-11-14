@@ -28,7 +28,9 @@ public class RBF {
 		rbfOutput = new double[K];
 
 		initializeRandomWeights(seed);
-		initializeRBFParams(inputFilename);
+		getInputsFromFile(inputFilename);
+		readTeacherOutput(inputFilename);
+		initializeRBFParams();
 	}
 
 	//Given an input returns the output of specific RBF neuron
@@ -56,20 +58,37 @@ public class RBF {
 
 	//Given the input save output of the RBF layer to rbfOutput
 	private void getRBFOutput(double[] input) {
-		for(int i=0; i<N; i++){
+		for(int i=0; i<K; i++){
 			rbfOutput[i] = gaussian(input, i);
 		}
 	}
 
 	//TODO Use clustering
-	private void initializeRBFParams(String inputFilename) {
+	//Now: only a random subset
+	private void initializeRBFParams() {
 		centers = new double[K][N];
 		sizes = new double[K];
+
 		//TODO clustering algorithm
-		for (double[] row: centers){
-			Arrays.fill(row, 2.0);
+		//Contains unique indices for centers (chosen from the inputData)
+		List<Integer> indices = new ArrayList<Integer>();
+		//Generate K unique indices
+		Random rand = new Random();
+		while(indices.size()<K){
+			int randomIndex = rand.nextInt(inputData.length);
+			if(indices.contains(randomIndex)){
+				continue;
+			}
+			indices.add(randomIndex);
 		}
-    	Arrays.fill(sizes, 1.0);
+		
+		//Use these indices to initialize centers
+		for(int i=0; i<K; i++){
+			centers[i] = inputData[indices.get(i)];
+		}
+
+		//TODO clustering algorithm
+    	Arrays.fill(sizes, 0.5); //Use your intuition
 	}
 
 	//Saves inputs to inputData
@@ -210,7 +229,7 @@ public class RBF {
 	//Test for correct reading from file
 	public void test(){
 		for(int i=0; i<teacher.length; i++){
-			System.out.println(Arrays.toString(teacher[i]));
+			System.out.println(Arrays.toString(inputData[i]));
 		}
 		
 	}
@@ -222,12 +241,15 @@ public class RBF {
 		******************************/
 		//Number of neurons in each layer
 		int[] configuration = {1, 4, 1};
+		//For "trainRBF.pat-1" use {2, K, 1}
+		//For "trainRBF.pat-1" use {1, K, 1}
+		//where K is the number of RBF neurons
 
 		//rates of learning for every hidden performing calculations layer
 		double learningRate = 0.1;
 		
 		//seed for initializing random
-		int seed = 42;
+		int seed = 41;
 
 		String inputFilename = "trainRBF.pat-2";
 		String errorFilename = "learning.curve";
@@ -239,16 +261,16 @@ public class RBF {
 		RBF rbf = new RBF(configuration, seed, learningRate, inputFilename);
 
 		rbf.printParams();
+		//rbf.test();
 
-		rbf.getInputsFromFile(inputFilename);
-		rbf.readTeacherOutput(inputFilename);
-		
 		//Learn!
 		int indexPattern = 0;
 		for(double[] input : rbf.inputData) {
 			rbf.errors.add(rbf.singleStepLearning(input, indexPattern));
 			indexPattern ++;
 		}
+				
+		rbf.printParams();
 
 		//put errors to file for gnuplot
 		rbf.printOutErrorCurve(errorFilename);
