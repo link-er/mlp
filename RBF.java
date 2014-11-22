@@ -1,5 +1,3 @@
-package neuronet_4;
-
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -81,7 +79,7 @@ public class RBF {
 			}
 			indices.add(randomIndex);
 		}
-		
+
 		//Use these indices to initialize centers
 		for(int i=0; i<K; i++){
 			centers[i] = inputData[indices.get(i)];
@@ -203,7 +201,7 @@ public class RBF {
 			System.out.println("Weights of the neuron " + String.valueOf(i+1) + ":");
 			for (int j=0; j<K; j++){
 				System.out.println(weights[i][j]);
-			}				
+			}
 		}
 	}
 
@@ -228,7 +226,7 @@ public class RBF {
 		for(int i=0; i<teacher.length; i++){
 			System.out.println(Arrays.toString(inputData[i]));
 		}
-		
+
 	}
 
 	public static void main(String[] args){
@@ -244,7 +242,7 @@ public class RBF {
 
 		//rates of learning for every hidden performing calculations layer
 		double learningRate = 0.1;
-		
+
 		//seed for initializing random
 		int seed = 41;
 
@@ -266,7 +264,7 @@ public class RBF {
 			rbf.errors.add(rbf.singleStepLearning(input, indexPattern));
 			indexPattern ++;
 		}
-				
+
 		rbf.printParams();
 
 		//put errors to file for gnuplot
