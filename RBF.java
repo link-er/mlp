@@ -1,3 +1,5 @@
+package neuronet_4;
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -63,13 +65,11 @@ public class RBF {
 		}
 	}
 
-	//TODO Use clustering
 	//Now: only a random subset
 	private void initializeRBFParams() {
 		centers = new double[K][N];
 		sizes = new double[K];
 
-		//TODO clustering algorithm
 		//Contains unique indices for centers (chosen from the inputData)
 		List<Integer> indices = new ArrayList<Integer>();
 		//Generate K unique indices
@@ -87,7 +87,6 @@ public class RBF {
 			centers[i] = inputData[indices.get(i)];
 		}
 
-		//TODO clustering algorithm
     	Arrays.fill(sizes, 0.5); //Use your intuition
 	}
 
@@ -106,11 +105,9 @@ public class RBF {
    				if (line.startsWith("#") || line.equals("")){
    					continue;
    				} else {
-   					String[] allValues = line.substring(1).replaceAll("\\s+", " ").split(" ");
+   					String[] allValues = line.substring(1).replaceAll("\\s+", " ").replaceAll("^\\s", "").split(" ");
    					//System.out.println(allValues[3]);
    					double[] row = new double[N];
-   					//i=1 because each line starts with a space...
-   					//TO FIX 
    					for(int i=0; i<N; i++){
    						row[i]= Double.parseDouble(allValues[i]);
    					}
