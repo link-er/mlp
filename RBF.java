@@ -242,7 +242,7 @@ public class RBF {
 		int seed = 41;
 
 		String inputFilename = "trainRBF.pat-1";
-		String errorFilename = "learning.curve";
+		String errorFilename = "learningcurve.dat";
 
 		/******************************
 		Set parameters here
