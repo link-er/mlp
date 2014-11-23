@@ -1,4 +1,5 @@
 
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
@@ -6,6 +7,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 public class RBF {
@@ -230,7 +234,7 @@ public class RBF {
 		Set parameters here
 		******************************/
 		//Number of neurons in each layer
-		int[] configuration = {2, 4, 1};
+		int[] configuration = {1, 4, 1};
 		//For "trainRBF.pat-1" use {2, K, 1}
 		//For "trainRBF.pat-1" use {1, K, 1}
 		//where K is the number of RBF neurons
@@ -241,7 +245,7 @@ public class RBF {
 		//seed for initializing random
 		int seed = 41;
 
-		String inputFilename = "trainRBF.pat-1";
+		String inputFilename = "trainRBF.pat-2";
 		String errorFilename = "learningcurve.dat";
 
 		/******************************
@@ -260,12 +264,13 @@ public class RBF {
 		int iterationNum = 0;
 		PrintWriter fout = null;
 		try {
+			Files.deleteIfExists(Paths.get(errorFilename));
 			fout = new PrintWriter(new BufferedWriter(new FileWriter(errorFilename, true)));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 //		criterion of stopping - error is less than 0.1
-		while(currentError > 0.1) {
+		while(currentError > 0.003) {
 			for(double[] input : rbf.inputData) {
 				currentError = rbf.singleStepLearning(input, indexPattern);
 				rbf.errors.add(currentError);
