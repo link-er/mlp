@@ -1,6 +1,10 @@
+
+
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
@@ -63,7 +67,7 @@ public class RBF {
 		}
 	}
 
-	//Now: only a random subset
+	//a random subset
 	private void initializeRBFParams() {
 		centers = new double[K][N];
 		sizes = new double[K];
@@ -206,10 +210,10 @@ public class RBF {
 	}
 
 	//Write error to the file
-	public void printOutErrorCurve(String errorFilename){
+	public void printOutErrorCurve(String errorFilename, boolean append){
 		PrintWriter fout;
 		try{
-			fout = new PrintWriter(errorFilename);
+			fout = new PrintWriter(new BufferedWriter(new FileWriter(errorFilename, append)));
 			for(int i=0; i<errors.size(); i++){
 				fout.printf("%d %f ", i, errors.get(i));
 				fout.printf("\n");
@@ -218,6 +222,9 @@ public class RBF {
 		}
 		catch (FileNotFoundException e){
 			System.out.println( e.getMessage() );
+		}
+		catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -260,14 +267,25 @@ public class RBF {
 
 		//Learn!
 		int indexPattern = 0;
-		for(double[] input : rbf.inputData) {
-			rbf.errors.add(rbf.singleStepLearning(input, indexPattern));
-			indexPattern ++;
+		double currentError = 100;
+		double errorSum = 0;
+		int iterationNum = 0;
+//		criterion of stopping - error is less than 0.1
+		while(currentError > 0.1) {
+			for(double[] input : rbf.inputData) {
+				currentError = rbf.singleStepLearning(input, indexPattern);
+				rbf.errors.add(currentError);
+				errorSum += currentError;
+				indexPattern++;
+			}
+//			error is counted like mean of all errors on the input file
+			currentError = errorSum/rbf.inputData.length;
+			indexPattern = 0;
+			errorSum = 0;
+			rbf.printOutErrorCurve(errorFilename, iterationNum != 0);
+			rbf.errors = new ArrayList<>();
 		}
 
 		rbf.printParams();
-
-		//put errors to file for gnuplot
-		rbf.printOutErrorCurve(errorFilename);
 	}
 }
