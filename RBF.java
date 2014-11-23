@@ -1,5 +1,4 @@
 
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
@@ -210,21 +209,10 @@ public class RBF {
 	}
 
 	//Write error to the file
-	public void printOutErrorCurve(String errorFilename, boolean append){
-		PrintWriter fout;
-		try{
-			fout = new PrintWriter(new BufferedWriter(new FileWriter(errorFilename, append)));
-			for(int i=0; i<errors.size(); i++){
-				fout.printf("%d %f ", i, errors.get(i));
-				fout.printf("\n");
-			}
-			fout.close();
-		}
-		catch (FileNotFoundException e){
-			System.out.println( e.getMessage() );
-		}
-		catch (IOException e) {
-			e.printStackTrace();
+	public void printOutErrorCurve(PrintWriter fout, int start){
+		for(int i=0; i<errors.size(); i++){
+			fout.printf("%d %f ", i + start, errors.get(i));
+			fout.printf("\n");
 		}
 	}
 
@@ -242,7 +230,7 @@ public class RBF {
 		Set parameters here
 		******************************/
 		//Number of neurons in each layer
-		int[] configuration = {1, 4, 1};
+		int[] configuration = {2, 4, 1};
 		//For "trainRBF.pat-1" use {2, K, 1}
 		//For "trainRBF.pat-1" use {1, K, 1}
 		//where K is the number of RBF neurons
@@ -253,7 +241,7 @@ public class RBF {
 		//seed for initializing random
 		int seed = 41;
 
-		String inputFilename = "trainRBF.pat-2";
+		String inputFilename = "trainRBF.pat-1";
 		String errorFilename = "learning.curve";
 
 		/******************************
@@ -270,6 +258,12 @@ public class RBF {
 		double currentError = 100;
 		double errorSum = 0;
 		int iterationNum = 0;
+		PrintWriter fout = null;
+		try {
+			fout = new PrintWriter(new BufferedWriter(new FileWriter(errorFilename, true)));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 //		criterion of stopping - error is less than 0.1
 		while(currentError > 0.1) {
 			for(double[] input : rbf.inputData) {
@@ -282,10 +276,12 @@ public class RBF {
 			currentError = errorSum/rbf.inputData.length;
 			indexPattern = 0;
 			errorSum = 0;
-			rbf.printOutErrorCurve(errorFilename, iterationNum != 0);
+			rbf.printOutErrorCurve(fout, iterationNum*rbf.inputData.length);
+			iterationNum++;
 			rbf.errors = new ArrayList<>();
 		}
 
+		fout.close();
 		rbf.printParams();
 	}
 }
