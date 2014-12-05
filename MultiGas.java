@@ -1,4 +1,5 @@
 
+
 import java.io.*;
 import java.nio.charset.*;
 import java.nio.file.*;
@@ -22,7 +23,7 @@ public class MultiGas {
 		this.N = N;
 		this.tMax = tMax;
 		findPatterns();
-		initializeCenters(structure);
+		initializeRandomCenters();
 	}
 
 	public MultiGas(int M, int N, String filename, int[] structure) {
@@ -31,7 +32,7 @@ public class MultiGas {
 		this.M = M;
 		this.N = N;
 		readPatterns(filename);
-		initializeCenters(structure);
+		initializeCenters();
 	}
 
 	private void checkInput(int M, int[] structure) {
@@ -60,8 +61,19 @@ public class MultiGas {
 		}
 	}
 
+	private void initializeRandomCenters() {
+		centers = new double[M][][];
+		for (int i = 0; i < M; i++) {
+			centers[i] = new double[structure[i]][N];
+			// Use these indices to initialize centers
+			for (int j = 0; j < structure[i]; j++) {
+				centers[i][j] = drawRandomPoint(0,1);
+			}
+		}
+	}
+
 	// Initialize centers as a random subset of the patterns
-	private void initializeCenters(int[] structure) {
+	private void initializeCenters() {
 		System.out.println(patterns.length);
 		centers = new double[M][][];
 		for (int i = 0; i < M; i++) {
@@ -195,15 +207,14 @@ public class MultiGas {
 		try {
 			PrintWriter fout = new PrintWriter(new BufferedWriter(
 					new FileWriter(outFilename)));
-			fout.println("=============================");
 			for (int i = 0; i < M; i++) {
-				fout.println("Neron Gas " + String.valueOf(i));
 				for (int j = 0; j < centers[i].length; j++) {
-					fout.println(Arrays.toString(centers[i][j]));
+					for (int k = 0; k < N; k++) {
+						fout.printf("%f ", centers[i][j][k]);
+					}
+					fout.printf("\n");
 				}
-				fout.println("");
 			}
-			fout.println("=============================");
 			fout.close();
 		} catch (IOException e) {
 			// if any I/O error occurs
@@ -247,14 +258,14 @@ public class MultiGas {
 		// number of neurons
 		int K = 17;
 		// number of partners
-		int M = 5;
-		int[] structure = { 2, 2, 3, 3, 7 }; // the length of this array should
+		int M = 4;
+		int[] structure = { 5, 10, 3, 7 }; // the length of this array should
 											// be always equal M
 											// and sum of elements is supposed to be equal K
 		// input dimension
-		int N = 3;
+		int N = 2;
 		String patternsFilename = "train_PA-E.dat";
-		int tMax = 1000;
+		int tMax = 10000000;
 
 //		uncomment for random generated patterns
 		MultiGas gas = new MultiGas(M, N, tMax, structure);
