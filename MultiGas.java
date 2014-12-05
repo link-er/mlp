@@ -1,31 +1,23 @@
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+
+import java.io.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.util.*;
 
 public class MultiGas {
 	private double[][] patterns;
 	private double[][][] centers;
 	private final int M;
 	private final int N;
-	// private int K;
+	private int[] structure;
 	private final double nInit = 0.6;
 	private final double nFin = 0;
 	private final double gaussianSize = 0.5;
 	private int tMax;
 
-	public MultiGas(int K, int M, int N, int tMax, int[] structure) {
+	public MultiGas(int M, int N, int tMax, int[] structure) {
 		checkInput(M, structure);
-		// this.K = K;
+		this.structure = structure;
 		this.M = M;
 		this.N = N;
 		this.tMax = tMax;
@@ -33,9 +25,9 @@ public class MultiGas {
 		initializeCenters(structure);
 	}
 
-	public MultiGas(int K, int M, int N, String filename, int[] structure) {
+	public MultiGas(int M, int N, String filename, int[] structure) {
 		checkInput(M, structure);
-		// this.K = K;
+		this.structure = structure;
 		this.M = M;
 		this.N = N;
 		readPatterns(filename);
@@ -51,8 +43,6 @@ public class MultiGas {
 
 	private void readPatterns(String inputFilename) {
 		try {
-			BufferedReader br = new BufferedReader(
-					new FileReader(inputFilename));
 			List<String> lines = Files.readAllLines(Paths.get(inputFilename),
 					Charset.defaultCharset());
 			patterns = new double[lines.size()][N];
@@ -138,21 +128,24 @@ public class MultiGas {
 		return randomPoint;
 	}
 
+//	rate of learning that is changing with time from initial value to the final value
 	private double rate(int t) {
 		return nInit * Math.pow((nFin / nInit), (t / tMax));
 	}
 
+//	neighborhood function with fixed size
 	private double gaussian(int distance) {
 		return Math.exp(-Math.pow(distance, 2)
 				/ (2 * Math.pow(gaussianSize, 2)));
 	}
 
-	private void sortCenters(int winnerGas, double[] response) {
-		// TODO for winner Gas from first index reorder by second index
-	}
-
-	private void changeWinnerCenters(int winnerGas, int t) {
-		// TODO adjust centers
+//	counting delta for changing the center
+	private double[] deltaCenter(int t, int sortedIndex, double[] center) {
+		double[] result = new double[N];
+		for(int i=0; i< N; i++) {
+			result[i] = rate(t) * gaussian(sortedIndex) * (patterns[t][i] - center[i]);
+		}
+		return result;
 	}
 
 	private double euclidianMetric(double[] center, double[] stimulus) {
@@ -163,22 +156,54 @@ public class MultiGas {
 		return Math.sqrt(sum);
 	}
 
-	private Winner applyStimulus(int t) {
-		// TODO find nearest center by euclidianMetrics and return index of Gas
-		// and center; call SortCenters
-		return null;
+	private void learnByStimulus(int t) {
+		int gasIndex = 0;
+		int currentWinnerGasIndex = 0;
+		int centerIndex;
+		double minDistance = euclidianMetric(centers[gasIndex][0], patterns[t]);
+		double currentDistance;
+		// find distances by euclidianMetrics
+//		and remember the gas with minimal distance
+		List<List<DataPair>> responces = new ArrayList<List<DataPair>>(M);
+		for(gasIndex = 0; gasIndex<M; gasIndex++) {
+			centerIndex = 0;
+			responces.add(new ArrayList<DataPair>(structure[gasIndex]));
+			for(double[] center : centers[gasIndex]) {
+				currentDistance = euclidianMetric(center, patterns[t]);
+				responces.get(gasIndex).add(new DataPair(centerIndex, currentDistance));
+				centerIndex++;
+				if(currentDistance < minDistance) {
+					minDistance = currentDistance;
+					currentWinnerGasIndex = gasIndex;
+				}
+			}
+		}
+//		sort winner gas by distances
+		Collections.sort(responces.get(currentWinnerGasIndex), new CustomDataPairComparator());
+
+//		find deltas for changing the winner gas centers
+		List<DataPair> sortedWinner = responces.get(currentWinnerGasIndex);
+		for(int i=0; i<structure[currentWinnerGasIndex]; i++) {
+			int currentCenter = sortedWinner.get(i).index;
+			double[] delta = deltaCenter(t, i, centers[currentWinnerGasIndex][currentCenter]);
+			for(int j=0; j<N; j++)
+				centers[currentWinnerGasIndex][currentCenter][j] += delta[j];
+		}
 	}
 
 	private void writeCentersToFile(String outFilename) {
 		try {
 			PrintWriter fout = new PrintWriter(new BufferedWriter(
 					new FileWriter(outFilename)));
-			for (int i = 0; i < tMax; i++) {
-				for (int j = 0; j < N; j++) {
-					fout.printf("%f ", patterns[i][j]);
+			fout.println("=============================");
+			for (int i = 0; i < M; i++) {
+				fout.println("Neron Gas " + String.valueOf(i));
+				for (int j = 0; j < centers[i].length; j++) {
+					fout.println(Arrays.toString(centers[i][j]));
 				}
-				fout.printf("\n");
+				fout.println("");
 			}
+			fout.println("=============================");
 			fout.close();
 		} catch (IOException e) {
 			// if any I/O error occurs
@@ -220,36 +245,46 @@ public class MultiGas {
 
 	public static void main(String[] args) {
 		// number of neurons
-		int K = 10;
+		int K = 17;
 		// number of partners
 		int M = 5;
 		int[] structure = { 2, 2, 3, 3, 7 }; // the length of this array should
-												// be always equal M
+											// be always equal M
+											// and sum of elements is supposed to be equal K
 		// input dimension
 		int N = 3;
 		String patternsFilename = "train_PA-E.dat";
 		int tMax = 1000;
 
-		MultiGas gas = new MultiGas(K, M, N, tMax, structure);
+//		uncomment for random generated patterns
+		MultiGas gas = new MultiGas(M, N, tMax, structure);
+//		uncomment for reading patterns from file
+//		MultiGas gas = new MultiGas(M, N, patternsFilename, structure);
 		gas.printParams();
-		gas.writeCentersToFile("PA-E.net");
+
 		// For testing
 		// gas.writePatternsToFile();
-		Winner currentWinner;
-		// for(int t=0; t<gas.tMax; t++) {
-		// currentWinner = gas.applyStimulus(t);
-		// gas.changeWinnerCenters(currentWinner.gasIndex, t);
-		// }
 
+		for(int t=0; t<gas.tMax; t++)
+			gas.learnByStimulus(t);
+
+		gas.writeCentersToFile("PA-E.net");
 	}
 
-	public class Winner {
-		public int gasIndex;
-		public int centerIndex;
+	public class DataPair {
+		public int index;
+		public Double distance;
 
-		public Winner(int gas, int center) {
-			gasIndex = gas;
-			centerIndex = center;
+		public DataPair(int index, double distance) {
+			this.index = index;
+			this.distance = distance;
+		}
+	}
+
+	public class CustomDataPairComparator implements Comparator<DataPair> {
+		@Override
+		public int compare(DataPair object1, DataPair object2) {
+			return object1.distance.compareTo(object2.distance);
 		}
 	}
 }
