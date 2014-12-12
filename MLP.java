@@ -1,57 +1,75 @@
-package machine_learning4;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+import java.util.Scanner;
 
-import java.util.*;
-import java.io.*;
-
-public class MLP{
+public class MLP {
 	private static int[] transferFunctions;
 	private static double[] rates;
-	
-	private int numberOfLayers;
+
+	private int numberOfLayers; // Including input layer
 	private int numberOfInputs;
 	private int numberOfOutputs;
 	private double[][] inputDataEpoch;
 	private double[][][] weights;
-	private double[][] deltas;
+	private double[][] deltas; // All deltas for all neurons
 	private double[][][] weightChanges;
 	private double[][] teacher;
-	private double[][] outputsByNeurons;
-	
+	private double[][] weightedSums; // Weighted sums for all neurons,
+										// weightedSums[0] is the input!
+
+	// Initialize the arrays
 	private void setInitialWeights(int[] numberOfNeurons) {
-//		- 1 because we do not have weights for input layer
-		weights = new double[numberOfLayers-1][][];
-		for(int i=0; i<numberOfLayers-1; i++){
-//			for each layer we get particular number of neurons with number of inputs + BIAS
-			weights[i] = new double[numberOfNeurons[i+1]][numberOfNeurons[i]+1];
+		// - 1 because we do not have weights for input layer
+		weights = new double[numberOfLayers - 1][][];
+		for (int i = 0; i < numberOfLayers - 1; i++) {
+			// for each layer we get particular number of neurons with number of
+			// inputs + BIAS
+			weights[i] = new double[numberOfNeurons[i + 1]][numberOfNeurons[i] + 1];
 		}
-		outputsByNeurons = new double[numberOfLayers-1][];
-		for(int i=0; i<numberOfLayers-1; i++){
-//			for each layer we get particular number of neurons with number of inputs + BIAS
-			outputsByNeurons[i] = new double[numberOfNeurons[i+1]];
+		weightedSums = new double[numberOfLayers][];
+		for (int i = 0; i < numberOfLayers; i++) {
+			// for each layer we get particular number of neurons with number of
+			// inputs + BIAS
+			weightedSums[i] = new double[numberOfNeurons[i]];
 		}
-		deltas = new double[numberOfLayers-1][];
-		for(int i=0; i<numberOfLayers-1; i++){
-//			for each layer we get particular number of neurons with number of inputs + BIAS
-			deltas[i] = new double[numberOfNeurons[i+1]];
+		deltas = new double[numberOfLayers - 1][];
+		for (int i = 0; i < numberOfLayers - 1; i++) {
+			// for each layer we get particular number of neurons with number of
+			// inputs + BIAS
+			deltas[i] = new double[numberOfNeurons[i + 1]];
 		}
-//		initialize weight changes with zeroes - so momentum and cumulated weights change for the first step is 0
-		weightChanges = new double[numberOfLayers-1][][];
-		for(int i=0; i<numberOfLayers-1; i++){
-			weightChanges[i] = new double[numberOfNeurons[i+1]][numberOfNeurons[i]+1];
-			for(double[] neuronWeights : weightChanges[i])
+		// initialize weight changes with zeroes - so momentum and cumulated
+		// weights change for the first step is 0
+		weightChanges = new double[numberOfLayers - 1][][];
+		for (int i = 0; i < numberOfLayers - 1; i++) {
+			weightChanges[i] = new double[numberOfNeurons[i + 1]][numberOfNeurons[i] + 1];
+			for (double[] neuronWeights : weightChanges[i])
 				Arrays.fill(neuronWeights, 0.0);
 		}
 	}
 
-	public MLP(int[] numberOfNeurons, int seed){
+	// Constructor for random weights
+	public MLP(int[] numberOfNeurons, int seed) {
 		this.numberOfLayers = numberOfNeurons.length;
 		this.numberOfInputs = numberOfNeurons[0];
 		this.numberOfOutputs = numberOfNeurons[numberOfNeurons.length - 1];
 		setInitialWeights(numberOfNeurons);
 		initializeRandomWeights(seed);
 	}
-	
-	public MLP(int[] numberOfNeurons, String fileWithWeights){
+
+	// Constructor for reading weights from file
+	public MLP(int[] numberOfNeurons, String fileWithWeights) {
 		this.numberOfLayers = numberOfNeurons.length;
 		this.numberOfInputs = numberOfNeurons[0];
 		this.numberOfOutputs = numberOfNeurons[numberOfNeurons.length - 1];
@@ -59,297 +77,368 @@ public class MLP{
 		initializeWeightsFromFile(fileWithWeights);
 	}
 
-	private void initializeWeightsFromFile(String filename){
+	// Read weights from file
+	private void initializeWeightsFromFile(String filename) {
 		try {
 			File file = new File(filename);
 			Scanner scanner = new Scanner(file);
-			for(int i=0; i<numberOfLayers-1; i++){
-			//+ 1 for BIAS
-				for(int j=0; j<weights[i].length; j++){
-					for(int k=0; k<weights[i][j].length; k++){
+			for (int i = 0; i < numberOfLayers - 1; i++) {
+				// + 1 for BIAS
+				for (int j = 0; j < weights[i].length; j++) {
+					for (int k = 0; k < weights[i][j].length; k++) {
 						weights[i][j][k] = scanner.nextDouble();
 					}
 				}
 			}
 			scanner.close();
-		}
-		catch (FileNotFoundException e) {
+		} catch (FileNotFoundException e) {
 			System.out.println("File with weights not found!");
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			System.out.println("Wrong dimensions in file!");
 		}
 	}
 
-	//Initialize all weights using a seed for random generator
-	private void initializeRandomWeights(int seed){
-		//weights = new double[numberOfLayers-1][numberOfNeurons][numberOfNeurons+1];
-		for (int i=0; i<numberOfLayers-1; i++){
-			for (int j=0; j<weights[i].length; j++){
-				for (int k=0; k<weights[i][j].length; k++){
-					Random rand = new Random(seed+k*5);
-					weights[i][j][k] = -5 + 10 * rand.nextDouble();
-				}				
+	// Initialize all weights using a seed for random generator
+	private void initializeRandomWeights(int seed) {
+		Random rand = new Random(seed);
+		for (int i = 0; i < numberOfLayers - 1; i++) {
+			for (int j = 0; j < weights[i].length; j++) {
+				for (int k = 0; k < weights[i][j].length; k++) {
+					weights[i][j][k] = (rand.nextDouble() - 0.5) * 4;
+				}
 			}
 		}
 	}
 
-	//Transfer function given an input and number of layer
-	private double transfer(double net, int layerNumber){
-		switch (transferFunctions[layerNumber]){
-			case 0: return net;
-			case 1: return (Math.exp(net) - Math.exp(-net))/(Math.exp(net) + Math.exp(-net));
-			case 2: return 1/(1 + Math.exp(-net));
-			default: return -42;
-		}
-	}
-	
-	private double deriviative(int layerNumber, int neuronNumber) {
-		switch (transferFunctions[layerNumber]){
-			case 0: return 1;
-			case 1: return 1 - Math.pow(transfer(outputsByNeurons[layerNumber][neuronNumber], layerNumber), 2);
-			case 2: return transfer(outputsByNeurons[layerNumber][neuronNumber], layerNumber)*
-					(1 - transfer(outputsByNeurons[layerNumber][neuronNumber], layerNumber));
-			default: return -42;
+	// Transfer function. given an input and the number of layer
+	private double transfer(double net, int layerNumber) {
+		switch (transferFunctions[layerNumber]) {
+		case 0:
+			return net;
+		case 1:
+			return (Math.exp(net) - Math.exp(-net))
+					/ (Math.exp(net) + Math.exp(-net));
+		case 2:
+			return 1 / (1 + Math.exp(-net));
+		default:
+			return -42;
 		}
 	}
 
-	//Given the input for the layer and the number of layer
-	//returns the output of layer
-	private double[] getLayerOutput(double[] inputs, int layerNumber){
-//		layerNumber is always smaller than real layer index, as we count only calculative layers
-		double[] outputs = new double[weights[layerNumber].length];
-		for(int neuronIndex=0; neuronIndex < outputs.length; neuronIndex++){
-			double net = 1*weights[layerNumber][neuronIndex][0]; //BIAS
-			for (int j = 1; j < weights[layerNumber][neuronIndex].length; j++){
-				net += inputs[j-1] * weights[layerNumber][neuronIndex][j];
+	// The derivative, given an input and number of layer
+	private double deriviative(double net, int layerNumber) {
+		switch (transferFunctions[layerNumber]) {
+		case 0:
+			return 1;
+		case 1:
+			return 1 - Math.pow(transfer(net, layerNumber), 2);
+		case 2:
+			return transfer(net, layerNumber)
+					* (1 - transfer(net, layerNumber));
+		default:
+			return -42;
+		}
+	}
+
+	// Reads file and sets an array of input values for the MLP
+	private void getInputsFromFile(String inputFilename) {
+		try {
+			List<String> content = Files.readAllLines(Paths.get(inputFilename),
+					Charset.defaultCharset());
+			List<String> patterns = new ArrayList<String>();
+			for (String line : content) {
+				if (line.startsWith("#")) {
+					continue;
+				}
+				patterns.add(line);
 			}
-			outputsByNeurons[layerNumber][neuronIndex] = net;
-			outputs[neuronIndex] = transfer(net, layerNumber);
-		}
-		return outputs;
-	}
-
-	//Reads file and sets an array of input values for the MLP
-	private void getInputsFromFile(String inputFilename){
-		try{
-			BufferedReader br = new BufferedReader(new FileReader(inputFilename));
-			String line;
-			int numberOfPatterns = 4;
-			inputDataEpoch = new double[numberOfPatterns][numberOfInputs];
-			int j=0;
-			while ((line = br.readLine()) != null) {
-   				if (line.startsWith("#")){
-   					continue;
-   				} else {
-   					String[] allValues = line.split(" ");
-   					double[] row = new double[numberOfInputs];
-   					for(int i=0; i<numberOfInputs; i++){
-   						row[i]= Double.parseDouble(allValues[i]);
-   					}
-   					inputDataEpoch[j] = row;
-   					j++;
-   				}
-   				
+			inputDataEpoch = new double[patterns.size()][numberOfInputs];
+			int j = 0;
+			for (String line : patterns) {
+				String[] allValues = line.split(" ");
+				for (int i = 0; i < numberOfInputs; i++) {
+					inputDataEpoch[j][i] = Double.parseDouble(allValues[i]);
+				}
+				j++;
 			}
-			br.close();
+		} catch (IOException e) {
+			System.out.println(e.getMessage());
 		}
-		catch(IOException e){
-			System.out.println( e.getMessage() );
-		}
+
 	}
 
-	//Print out the weights for each layer and each neuron
-	public void printWeights(){
-		for (int i=0; i<numberOfLayers-1; i++){
+	// Print out the weights for each layer and each neuron
+	public void printWeights() {
+		for (int i = 0; i < numberOfLayers - 1; i++) {
 			System.out.println("");
-			System.out.println("Weights of the layer" + String.valueOf(i+2) + ":");
-			for (int j=0; j<weights[i].length; j++){
-				System.out.println("Weights of the neuron" + String.valueOf(j+1) + ":");
-				for (int k=0; k<weights[i][j].length; k++){
+			System.out.println("Weights of the layer" + String.valueOf(i + 2)
+					+ ":");
+			for (int j = 0; j < weights[i].length; j++) {
+				System.out.println("Weights of the neuron"
+						+ String.valueOf(j + 1) + ":");
+				for (int k = 0; k < weights[i][j].length; k++) {
 					System.out.println(weights[i][j][k]);
-				}				
+				}
 			}
 		}
 	}
-	
-//	for getting teacher values from file
+
+	// Read teacher values from the file
 	private void readTeacherOutput(String inputFilename) {
-		try{
-			BufferedReader br = new BufferedReader(new FileReader(inputFilename));
-			String line;
-			int numberOfPatterns = 4;
-			teacher = new double[numberOfPatterns][numberOfOutputs];
-			int j=0;
-			while ((line = br.readLine()) != null) {
-   				if (line.startsWith("#")){
-   					continue;
-   				} else {
-   					String[] allValues = line.replaceAll("\\s+", " ").split(" ");
-   					double[] row = new double[numberOfOutputs];
-   					for(int i=numberOfInputs; i<numberOfInputs + numberOfOutputs; i++){
-   						row[i - numberOfInputs] = Double.parseDouble(allValues[i]);
-   					}
-   					teacher[j] = row;
-   					j++;
-   				}
-   				
+		try {
+			List<String> content = Files.readAllLines(Paths.get(inputFilename),
+					Charset.defaultCharset());
+			List<String> teacherRawValues = new ArrayList<String>();
+			for (String line : content) {
+				if (line.startsWith("#")) {
+					continue;
+				}
+				teacherRawValues.add(line);
 			}
-			br.close();
-		}
-		catch(IOException e){
-			System.out.println( e.getMessage() );
+			teacher = new double[teacherRawValues.size()][numberOfOutputs];
+			int j = 0;
+			for (String line : teacherRawValues) {
+				String[] allValues = line.split(" +");
+				for (int i = numberOfInputs; i < numberOfInputs
+						+ numberOfOutputs; i++) {
+					teacher[j][i - numberOfInputs] = Double
+							.parseDouble(allValues[i]);
+				}
+				j++;
+			}
+		} catch (IOException e) {
+			System.out.println(e.getMessage());
 		}
 	}
-	
-//	count error by standard formula
+
+	// Count error by standard formula
 	private double error(double[] output, double[] teacher) {
 		double sum = 0.0;
-		for(int i=0; i<numberOfOutputs; i++)
+		for (int i = 0; i < numberOfOutputs; i++)
 			sum += Math.pow(output[i] - teacher[i], 2);
-		return 0.5*sum;
-	}
-	
-	private double[] run(double[] input) {
-//		go by layers and apply transferfunctions to get output
-//		save outputs for each neuron
-		double[] previousOutput = input;
-//		start from the first hidden layer
-		for(int j=0; j<numberOfLayers-1; j++){
-			previousOutput = getLayerOutput(previousOutput, j);
-		}
-		return previousOutput;
+		return 0.5 * sum;
 	}
 
-	private double singleStepLearning(double[] input, int patternNumber) {
-		double[] result = run(input);
-		
-		int neuronIndex = 0, weightIndex = 0;
-		for(int layerIndex = numberOfLayers-2; layerIndex>=0; layerIndex-- ) {
-			for(double[] neuron : weights[layerIndex]) {
-				double delta = delta(patternNumber, layerIndex, neuronIndex);
-				for(double weight : neuron) {
-					weightChanges[layerIndex][neuronIndex][weightIndex] = 
-							weightChange(layerIndex, neuronIndex, weightIndex, delta);
-					weightIndex ++;
-				}
-				neuronIndex ++;
-				weightIndex = 0;
-			}
-			neuronIndex = 0;
+	// Given the number of the layer and an input prints the output
+	private void printOutputOfLayer(double[] input, int layerNumber) {
+		System.out.println("Input: " + Arrays.toString(input));
+		System.out.println("Output of the layer " + layerNumber + ": "
+				+ Arrays.toString(getOutputOfLayer(input, layerNumber)));
+	}
+
+	// Given the number of the layer and an input returns the output
+	private double[] getOutputOfLayer(double[] input, int layerNumber) {
+		calculateWeightedSums(input);
+		double[] output = new double[weights[layerNumber - 2].length];
+		for (int i = 0; i < output.length; i++) {
+			output[i] = transfer(weightedSums[layerNumber - 1][i],
+					layerNumber - 2);
 		}
+		return output;
+	}
+
+	// Calculate and save all weighted sums for given input
+	private void calculateWeightedSums(double[] input) {
+
+		double[] previousOutput = input;
+		weightedSums[0] = input;
+		for (int layerNumber = 1; layerNumber < numberOfLayers; layerNumber++) {
+			List<Double> layerOutput = new ArrayList<Double>();
+			// System.out.println(Arrays.toString(previousOutput));
+			for (int neuronIndex = 0; neuronIndex < weights[layerNumber - 1].length; neuronIndex++) {
+				// BIAS
+				double net = weights[layerNumber - 1][neuronIndex][0];
+				for (int weightIndex = 1; weightIndex < weights[layerNumber - 1][neuronIndex].length; weightIndex++) {
+					net += previousOutput[weightIndex - 1]
+							* weights[layerNumber - 1][neuronIndex][weightIndex];
+				}
+				weightedSums[layerNumber][neuronIndex] = net;
+			}
+			// Calculate transfer functions of weighted sums of the previous
+			// layer and save to layerOutput
+
+			for (int i = 0; i < weightedSums[layerNumber].length; i++) {
+				layerOutput.add(transfer(weightedSums[layerNumber][i],
+						layerNumber - 1));
+			}
+			previousOutput = new double[layerOutput.size()];
+			for (int i = 0; i < layerOutput.size(); i++) {
+				previousOutput[i] = layerOutput.get(i);
+			}
+			layerOutput.clear();
+
+		}
+	}
+
+	// Calculate and save all deltas for given patternNumber (i.e. for teacher
+	// value)
+	private void calculateDeltas(int patternNumber) {
+		// Output layer
+		for (int i = 0; i < numberOfOutputs; i++) {
+			// double teacher = teacher[patternNumber][i];
+			deltas[numberOfLayers - 2][i] = (teacher[patternNumber][i] - transfer(
+					weightedSums[numberOfLayers - 1][i], numberOfLayers - 2))
+					* deriviative(weightedSums[numberOfLayers - 1][i],
+							numberOfLayers - 2);
+		}
+		// All other layers
+		for (int layerIndex = numberOfLayers - 3; layerIndex >= 0; layerIndex--) {
+			double[] deltasBelow = deltas[layerIndex + 1];
+			double[][] weightsBelow = weights[layerIndex + 1];
+			for (int neuronIndex = 0; neuronIndex < weights[layerIndex].length; neuronIndex++) {
+				double sumDeltas = 0.0;
+				double delta = 0.0;
+				// Calculate the sum
+				for (int neuronBelowIndex = 0; neuronBelowIndex < weightsBelow.length; neuronBelowIndex++) {
+					sumDeltas += deltasBelow[neuronBelowIndex]
+							* weightsBelow[neuronBelowIndex][neuronIndex + 1];
+				}
+				// Calculate delta
+				delta = sumDeltas
+						* deriviative(
+								weightedSums[layerIndex + 1][neuronIndex],
+								layerIndex);
+				deltas[layerIndex][neuronIndex] = delta;
+			}
+
+		}
+
+	}
+
+	// Change the weights and return an error for a specific input
+	private double singleStepLearning(double[] input, int patternNumber) {
+		// Calculate and save weighted sums for all neurons
+		calculateWeightedSums(input);
+
+		// Calculate and save all deltas
+		calculateDeltas(patternNumber);
+
+		// Calculate all changes at weights
+		for (int layerIndex = 0; layerIndex < numberOfLayers - 1; layerIndex++) {
+			for (int neuronIndex = 0; neuronIndex < weights[layerIndex].length; neuronIndex++) {
+				// Change BIAS weight
+				weightChanges[layerIndex][neuronIndex][0] = rates[layerIndex]
+						* deltas[layerIndex][neuronIndex] * 1;
+				// All the rest weights
+				for (int weightIndex = 1; weightIndex < weights[layerIndex][neuronIndex].length; weightIndex++) {
+					weightChanges[layerIndex][neuronIndex][weightIndex] = weightChange(
+							layerIndex, neuronIndex, weightIndex);
+				}
+			}
+		}
+		// Apply it
 		applyWeightChanges();
-		
+		// Calculate an output and return an error
+		double result[] = new double[numberOfOutputs];
+		for (int i = 0; i < result.length; i++) {
+			result[i] = transfer(weightedSums[numberOfLayers - 1][i],
+					numberOfLayers - 2);
+		}
 		return error(result, teacher[patternNumber]);
 	}
-	
+
+	// Apply all changes at weights at once
 	private void applyWeightChanges() {
-		int layerIndex = 0, neuronIndex = 0, weightIndex = 0;
-		for(double[][] layer : weights) {
-			for(double[] neuron : layer) {
-				for(double weight : neuron) {
+		for (int layerIndex = 0; layerIndex < numberOfLayers - 1; layerIndex++) {
+			for (int neuronIndex = 0; neuronIndex < weights[layerIndex].length; neuronIndex++) {
+				for (int weightIndex = 0; weightIndex < weights[layerIndex][neuronIndex].length; weightIndex++) {
 					weights[layerIndex][neuronIndex][weightIndex] += weightChanges[layerIndex][neuronIndex][weightIndex];
-					weightIndex ++;
 				}
-				neuronIndex ++;
-				weightIndex = 0;
 			}
-			layerIndex ++;
-			neuronIndex = 0;
 		}
 	}
-	
-	private double delta(int patternNumber, int layer, int neuron) {
-		double delta = 0;
-//		last layer, because we save deltas only for "computative" layers
-		if(layer == numberOfLayers - 2) {
-			delta = (teacher[patternNumber][neuron] - transfer(outputsByNeurons[layer][neuron], layer))*
-					deriviative(layer, neuron);
+
+	// Calculate changes at weights given a layer, neuron and a weight that
+	// changes
+	private double weightChange(int layer, int neuron, int weight) {
+
+		if (layer == 0) {
+			return rates[layer] * deltas[layer][neuron]
+					* (weightedSums[layer][neuron]);
+		} else {
+			return rates[layer] * deltas[layer][neuron]
+					* transfer(weightedSums[layer][weight - 1], layer);
 		}
-		else {
-			double sumDeltas = 0.0;
-			double[] belowLayerDeltas = deltas[layer + 1];
-			double[][] belowLayerWeights = weights[layer + 1];
-			int belowLayerNeuron = 0;
-			for(double[] belowNeuronWeights : belowLayerWeights) {
-				sumDeltas += belowLayerDeltas[belowLayerNeuron] * belowNeuronWeights[neuron];
-				belowLayerNeuron++;
+	}
+
+	// Run n (=5000) times learning, save errors to the file and print some nice
+	// message
+	public void singleLearning() {
+		List<Double> errors = new ArrayList<Double>();
+		int indexPattern;
+		double sumError = 0;
+		long startTime = System.nanoTime();
+		for (int i = 0; i < 5000; i++) {
+			indexPattern = 0;
+			for (double[] input : inputDataEpoch) {
+				sumError += singleStepLearning(input, indexPattern);
+				indexPattern++;
 			}
-			delta = sumDeltas * deriviative(layer, neuron);
+			errors.add(sumError);
+			sumError = 0;
 		}
-		deltas[layer][neuron] = delta;
-		return delta;
+		long endTime = System.nanoTime();
+		System.out
+				.print("Done! Errors are saved to the file 'errors.dat'. Duration (in ms): ");
+		System.out.println((endTime - startTime) / 1000000.0);
+
+		// Save errors to the file
+		String fileName = "errors.dat";
+		try {
+			PrintWriter fout = new PrintWriter(new BufferedWriter(
+					new FileWriter(fileName)));
+			for (int i = 0; i < errors.size(); i++) {
+				fout.printf("%d %f", i, errors.get(i));
+				fout.printf("\n");
+			}
+			fout.close();
+		} catch (IOException e) {
+			// if any I/O error occurs
+			e.printStackTrace();
+		}
 	}
-	
-	private double weightChange(int layer, int neuron, int weight, double delta) {
-		return rates[layer]*delta*transfer(outputsByNeurons[layer][neuron], layer);
-	}
-	
-	public static void main1(String[] args){
-		
+
+	public static void main(String[] args) {
+
 		/******************************
-		Set parameters here
-		******************************/
-		//Number of neurons in each layer
-		int[] configuration = {2, 2, 1};
-		
-		//rates of learning for every hidden performing calculations layer
-		double[] userRates = {0.2, 0.2};
+		 * Set parameters here
+		 ******************************/
+		// Number of neurons in each layer
+		int[] configuration = { 4, 4, 2 };
+
+		// rates of learning for every hidden performing calculations layer
+		double[] userRates = { 0.3, 0.01 };
 		rates = userRates;
-		
-		//Seed for random generator
-		int seed = 42;
-		
-		// Trnsfer functions for each layer:
-		//0 - identity, 1 - tahn, 2 - logistic
-		int[] userTransferFunctions = {2, 2};
+
+		// Seed for random generator
+		int seed = 41;
+
+		// Transfer functions for each layer:
+		// 0 - identity, 1 - tahn, 2 - logistic
+		int[] userTransferFunctions = { 1, 1 };
 		transferFunctions = userTransferFunctions;
-		
-		//Should always be true:
-		//configuration.length == transferFunctions.length + 1
+
+		// Should always be true:
+		// configuration.length == transferFunctions.length + 1
 		String inputFilename = "training.dat";
 
 		/******************************
-		Set parameters here
-		******************************/
+		 * Set parameters here
+		 ******************************/
 
 		MLP mlp = new MLP(configuration, seed);
-//		MLP mlp = new MLP(configuration, "weights.dat");
-		
-		mlp.printWeights();
+		// MLP mlp = new MLP(configuration, "weights.dat");
+
 		mlp.getInputsFromFile(inputFilename);
 		mlp.readTeacherOutput(inputFilename);
-		
-		double currentError = 100;
-		int indexPattern;
-		double sum = 0;
-		long startTime = System.nanoTime();
-		for(int i=0; i<100000; i++) {
-			indexPattern = 0;
-			for(double[] input : mlp.inputDataEpoch) {
-				sum += mlp.singleStepLearning(mlp.inputDataEpoch[indexPattern], indexPattern);
-				indexPattern ++;
-			}
-			//mlp.printWeights();
-			currentError = sum/mlp.inputDataEpoch.length;
-			sum = 0;
-		}
-		long endTime = System.nanoTime();
+		mlp.singleLearning();
 
-		System.out.print("Duration (in ms): ");
-		System.out.println((endTime - startTime) / 1000000.0);
-		
-		mlp.printWeights();
-		System.out.println();
-		System.out.println();
-		double[] inp = {0,0};
-		System.out.println(mlp.run(inp)[0]);
-		inp[1] = 1;
-		System.out.println(mlp.run(inp)[0]);
-		inp[0] = 1;
-		inp[1] = 0;
-		System.out.println(mlp.run(inp)[0]);
-		inp[1] = 1;
-		System.out.println(mlp.run(inp)[0]);
+		// Test and compare teacher values with the results. Sometimes looks
+		// pretty nice.
+		double[] testInput = { 0.1, 0.1, 0.1, 0.1 };
+		// 3 is the output layer
+		mlp.printOutputOfLayer(testInput, 3);
+
 	}
+
 }
