@@ -1,5 +1,3 @@
-package neuronet_7;
-
 import java.util.Arrays;
 import java.util.Random;
 
