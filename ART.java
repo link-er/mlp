@@ -1,3 +1,5 @@
+
+
 import java.util.Arrays;
 import java.util.Random;
 
@@ -7,14 +9,15 @@ public class ART {
 	private final int M;
 	private double[][] forwardWeights; //
 	private int[][] backwardWeights; //
+	private int[] g;
 
 	public ART(int N, int M) {
 		this.N = N;
 		this.M = M;
 		forwardWeights = new double[M][N];
 		backwardWeights = new int[N][M];
+		g = new int[N];
 		initializeRandomWeights();
-
 	}
 
 	private void initializeRandomWeights() {
@@ -31,7 +34,7 @@ public class ART {
 		for (int i = 0; i < N; i++) {
 			Arrays.fill(backwardWeights[i], 0);
 		}
-
+		Arrays.fill(g, 1);
 	}
 
 	private boolean isOnlyOneSet(int[] array) {
@@ -53,7 +56,7 @@ public class ART {
 	private int[] getComparisonLayerOutput(int[] input, int[] net) {
 		int[] comparisonLayerOutput = new int[N];
 		for (int i = 0; i < N; i++) {
-			if (input[i] * net[i] == 1) {
+			if (input[i] * net[i] == 1 || input[i] * g[i] == 1 || g[i] * net[i] == 1) {
 				comparisonLayerOutput[i] = 1;
 			} else {
 				comparisonLayerOutput[i] = 0;
@@ -63,42 +66,78 @@ public class ART {
 		return comparisonLayerOutput;
 	}
 
-	// TODO
 	private int[] getRecognitionLayerOutput(int[] comparisonLayerOutput) {
 		// 1. Calculate weighted sum for all neurons - to array
+		double[] weightedSums = new double[M];
+		for(int i=0; i<M; i++) {
+			weightedSums[i] = 0;
+			for(int j=0; j<N; j++)
+				weightedSums[i] += forwardWeights[i][j] * comparisonLayerOutput[j];
+		}
 		// 2. Determine the max value
+		double max = weightedSums[0];
+		int maxIndex = 0;
+		for(int i=0; i<M; i++) {
+			if(weightedSums[i] > max) {
+				max = weightedSums[i];
+				maxIndex = i;
+			}
+		}
 		// 3. return the array with only one '1'
-		return null;
+		int[] result = new int[M];
+		for(int i=0; i<M; i++) {
+			if(i==maxIndex)
+				result[i]=1;
+			else
+				result[i]=0;
+		}
+		return result;
 	}
 
-	// TODO
+	private int[] getComparisonInputFromRecognition(int[] recognitionLayerOutput) {
+		int[] weightedSums = new int[N];
+		for(int i=0; i<N; i++) {
+			weightedSums[i] = 0;
+			for(int j=0; j<M; j++)
+				weightedSums[i] += backwardWeights[i][j] * recognitionLayerOutput[j];
+		}
+		return weightedSums;
+	}
+
 	public int[] run(int[] input) {
 		int[] output = new int[M];
 		int[] comparisonLayerOutput = new int[N];
-		double[][] weightedSum = new double[M][N];
-		Arrays.fill(output, 0);
-		Arrays.fill(comparisonLayerOutput, 0);
+		int[] net = new int[N];
+		comparisonLayerOutput = Arrays.copyOf(input, N);
 		boolean isStable = false;
 		while (!isStable) {
-			comparisonLayerOutput = getComparisonLayerOutput(input, output);
 			output = getRecognitionLayerOutput(comparisonLayerOutput);
+			net = getComparisonInputFromRecognition(output);
+			comparisonLayerOutput = getComparisonLayerOutput(input, net);
+
 			if (42 == 42) {
 				isStable = true;
+				//learn V as product of Y and X^(-1)
+				//learn W by hebbian rule with teacher = output on stabilized state, input - primary input
 			}
 		}
 
 		return output;
 	}
 
-	// TODO
 	public int[] recover(int[] recognitionVector) {
 		if (isOnlyOneSet(recognitionVector)) {
-			return null;
+			int[] weightedSums = new int[N];
+			for(int i=0; i<N; i++) {
+				weightedSums[i] = 0;
+				for(int j=0; j<M; j++)
+					weightedSums[i] += backwardWeights[i][j] * recognitionVector[j];
+			}
+			return weightedSums;
 		} else {
 			System.out.println("Wrong input.");
 			return null;
 		}
-
 	}
 
 	public void printWeights() {
