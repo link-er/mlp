@@ -66,7 +66,7 @@ public class ART {
 		return comparisonLayerOutput;
 	}
 
-	private int[] getRecognitionLayerOutput(int[] comparisonLayerOutput) {
+	private double[] getRecognitionLayerOutput(int[] comparisonLayerOutput) {
 		// 1. Calculate weighted sum for all neurons - to array
 		double[] weightedSums = new double[M];
 		for(int i=0; i<M; i++) {
@@ -74,6 +74,10 @@ public class ART {
 			for(int j=0; j<N; j++)
 				weightedSums[i] += forwardWeights[i][j] * comparisonLayerOutput[j];
 		}
+		return weightedSums;
+	}
+
+	private int[] winnerTakesAll(double[] weightedSums) {
 		// 2. Determine the max value
 		double max = weightedSums[0];
 		int maxIndex = 0;
@@ -105,24 +109,50 @@ public class ART {
 	}
 
 	public int[] run(int[] input) {
+		double[] weightedSums = new double[M];
 		int[] output = new int[M];
 		int[] comparisonLayerOutput = new int[N];
 		int[] net = new int[N];
 		comparisonLayerOutput = Arrays.copyOf(input, N);
+
 		boolean isStable = false;
+		int[] prevComparisonOutput = new int[N];
+		Arrays.fill(prevComparisonOutput, 0);
+		int[] prevOutput = new int[M];
+		Arrays.fill(prevOutput, 0);
 		while (!isStable) {
-			output = getRecognitionLayerOutput(comparisonLayerOutput);
+//			move input through W to recognition layer
+			weightedSums = getRecognitionLayerOutput(comparisonLayerOutput);
+			hebbianLearn(input, weightedSums);
+//			apply WTA strategy to get array with one 1
+			output = winnerTakesAll(weightedSums);
+			learnBackward(input, output);
+//			move WTA result up by V
 			net = getComparisonInputFromRecognition(output);
+//			count result by 2/3 strategy
 			comparisonLayerOutput = getComparisonLayerOutput(input, net);
 
-			if (42 == 42) {
+			if (Arrays.equals(prevComparisonOutput, comparisonLayerOutput) &&
+					Arrays.equals(prevOutput, output)) {
 				isStable = true;
-				//learn V as product of Y and X^(-1)
-				//learn W by hebbian rule with teacher = output on stabilized state, input - primary input
+			}
+			else {
+				prevComparisonOutput = Arrays.copyOf(comparisonLayerOutput, N);
+				prevOutput = Arrays.copyOf(output, M);
 			}
 		}
 
 		return output;
+	}
+
+//	TODO
+	private void hebbianLearn(int[] input, double[] sums) {
+//		update W by hebbian rule
+	}
+
+//	TODO
+	private void learnBackward(int[] input, int[] output) {
+//		update V by asserting so that input = output*V
 	}
 
 	public int[] recover(int[] recognitionVector) {
@@ -163,6 +193,35 @@ public class ART {
 		ART art = new ART(20, 5);
 		art.printWeights();
 
+		Random rand = new Random();
+		int[][] patterns = new int[100][art.N];
+		for(int i=0; i<100; i++) {
+			for(int j=0; j<art.N; j++) {
+				if(rand.nextBoolean())
+					patterns[i][j] = 1;
+				else
+					patterns[i][j] = 0;
+			}
+			art.run(patterns[i]);
+		}
+
+		art.printWeights();
+
+		int[] result = new int[art.N];
+		int[][] checkUps = new int[100][art.M];
+		int indexNotZero;
+		for(int i=0; i<100; i++) {
+			indexNotZero = rand.nextInt(art.M);
+			for(int j=0; j<art.M; j++) {
+				if(j == indexNotZero)
+					checkUps[i][j] = 1;
+				else
+					checkUps[i][j] = 0;
+			}
+			System.out.println("Check up is: " + Arrays.toString(checkUps[i]));
+			result = art.recover(checkUps[i]);
+			System.out.println("Result is: " + Arrays.toString(result));
+		}
 	}
 
 }
